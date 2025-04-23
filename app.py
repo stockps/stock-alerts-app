@@ -17,7 +17,7 @@ def send_email(to_email, subject, body, from_email="stockalerts.ps@gmail.com"):
         msg['To'] = ", ".join(to_email)
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
-        
+
         # إعداد الاتصال بالخادم
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
@@ -36,35 +36,43 @@ def check_stock_and_notify(df):
         current_stock = row['Current Stock']
         min_stock = row['Min Stock Level']
         emails = row['Emails'].split(",")  # إذا كانت الإيميلات مفصولة بفواصل
-        
+
         # التحقق إذا كانت الكمية الحالية أقل من الحد الأدنى
-        if current_stock <= min_stock:
+        if current_stock < min_stock:
             subject = f"Low stock alert: {product_name}"
             body = f"Dear Customer,\n\nWe would like to inform you that the product '{product_name}' has reached the minimum stock level.\nCurrent stock: {current_stock}\n\nBest regards,\nStock Alerts Team"
-            
+
             # إرسال الإيميل لجميع العناوين
             send_email(emails, subject, body)
 
 # 4. حفظ البيانات بشكل تلقائي (تخزين الإيميلات وحالة المخزون في ملف إكسل)
 def save_data(df, file_path):
     df.to_excel(file_path, index=False)
+    print(f"Data saved successfully to {file_path}")
 
 # 5. نموذج لحفظ البيانات من التطبيق
 def enter_data():
     data = []
     while True:
         product_name = input("Enter product name: ")
-        current_stock = int(input(f"Enter current stock for {product_name}: "))
-        min_stock = int(input(f"Enter minimum stock level for {product_name}: "))
-        emails = input(f"Enter emails (comma separated) for {product_name}: ")
         
+        # التحقق من المدخلات لتكون أرقام صحيحة
+        try:
+            current_stock = int(input(f"Enter current stock for {product_name}: "))
+            min_stock = int(input(f"Enter minimum stock level for {product_name}: "))
+        except ValueError:
+            print("Please enter a valid number for stock values.")
+            continue
+        
+        emails = input(f"Enter emails (comma separated) for {product_name}: ")
+
         # إضافة البيانات المدخلة إلى القائمة
         data.append([product_name, current_stock, min_stock, emails])
-        
+
         more = input("Do you want to add more products? (y/n): ")
         if more.lower() != 'y':
             break
-    
+
     # تحويل البيانات إلى DataFrame وتخزينها في ملف إكسل
     df = pd.DataFrame(data, columns=["Product Name", "Current Stock", "Min Stock Level", "Emails"])
     save_data(df, "stock_data.xlsx")
@@ -84,7 +92,7 @@ def main():
     print("Stock Alerts - Inventory Management")
     while True:
         choice = input("Choose an option:\n1. Enter new product data\n2. Load existing data and check stock\n3. Exit\n")
-        
+
         if choice == '1':
             enter_data()
         elif choice == '2':
