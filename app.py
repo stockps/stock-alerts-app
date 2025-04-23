@@ -1,52 +1,64 @@
-import streamlit as st import pandas as pd import smtplib from email.mime.text import MIMEText from email.mime.multipart import MIMEMultipart
+import streamlit as st
+import pandas as pd
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
-st.set_page_config(page_title="Stock Alerts", layout="centered", page_icon="📦", initial_sidebar_state="collapsed") st.markdown(""" <style> body, .stApp { background-color: #f7f3ef; color: #3e3e3e; font-family: 'Segoe UI', sans-serif; } .stButton > button { background-color: #d9cbbd; color: #3e3e3e; border-radius: 10px; padding: 0.5em 1em; } .stTextInput, .stNumberInput, .stTextArea { background-color: #ffffff; border-radius: 10px; padding: 0.2em 0.5em; } </style> """, unsafe_allow_html=True)
+st.set_page_config(page_title="Stock Alerts", layout="centered")
+st.markdown("<h1 style='text-align: center; color: #6c757d;'>Stock Alerts Management</h1>", unsafe_allow_html=True)
 
-st.title("تنبيهات المخزون - Stock Alerts")
+def send_email(product_name, current_qty, recipient_emails, lang="en", custom_msg=None):
+    msg = MIMEMultipart()
+    msg["From"] = "stockalerts.ps@gmail.com"
+    msg["Subject"] = "Stock Alert Notification"
 
-st.write("أدخل بيانات المنتجات. سيتم إرسال تنبيه إذا وصلت الكمية للحد الأدنى.")
+    messages = {
+        "en": f"Product '{product_name}' has reached the minimum stock level.
+Current quantity: {current_qty}.",
+        "ar": f"نود إعلامكم بأن المنتج '{product_name}' وصل إلى الحد الأدنى من الكمية.
+الكمية الحالية: {current_qty}.",
+        "he": f"המוצר '{product_name}' הגיע לרמת המלאי המינימלית.
+כמות נוכחית: {current_qty}."
+    }
 
-Data Entry Table
+    text = custom_msg if custom_msg else messages.get(lang, messages["en"])
+    msg.attach(MIMEText(text, "plain"))
 
-product_data = [] num_rows = st.number_input("عدد المنتجات", min_value=1, max_value=50, step=1)
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login("stockalerts.ps@gmail.com", "APP_PASSWORD")
+        for email in recipient_emails:
+            msg["To"] = email
+            server.sendmail("stockalerts.ps@gmail.com", email, msg.as_string())
+        server.quit()
+        st.success("Emails sent successfully.")
+    except Exception as e:
+        st.error(f"Failed to send email: {str(e)}")
 
-for i in range(num_rows): st.markdown(f"### منتج {i+1}") name = st.text_input(f"اسم المنتج {i+1}", key=f"name_{i}") current_qty = st.number_input(f"الكمية الحالية {i+1}", min_value=0, key=f"qty_{i}") min_qty = st.number_input(f"الحد الأدنى {i+1}", min_value=0, key=f"min_{i}") product_data.append({"name": name, "current": current_qty, "min": min_qty})
+if "data" not in st.session_state:
+    st.session_state.data = pd.DataFrame(columns=["Product", "Current Qty", "Minimum Qty"])
 
-Email section
+st.subheader("Add Product Info")
+with st.form("entry_form"):
+    col1, col2, col3 = st.columns(3)
+    product = col1.text_input("Product")
+    current_qty = col2.number_input("Current Quantity", min_value=0, step=1)
+    min_qty = col3.number_input("Minimum Quantity", min_value=0, step=1)
+    emails = st.text_input("Emails (comma-separated, up to 5)")
+    lang = st.selectbox("Email Language", ["en", "ar", "he"])
+    custom_msg = st.text_area("Custom Message (optional)")
+    submitted = st.form_submit_button("Add")
 
-emails = st.text_area("أدخل الإيميلات (من 1 إلى 5) مفصولة بفاصلة ", placeholder="example1@mail.com, example2@mail.com") email_list = [email.strip() for email in emails.split(',') if email.strip()]
+    if submitted and product:
+        new_row = pd.DataFrame([[product, current_qty, min_qty]], columns=["Product", "Current Qty", "Minimum Qty"])
+        st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
+        if current_qty <= min_qty:
+            recipients = [e.strip() for e in emails.split(",") if e.strip()]
+            if 1 <= len(recipients) <= 5:
+                send_email(product, current_qty, recipients, lang, custom_msg)
+            else:
+                st.warning("Please enter between 1 and 5 email addresses.")
 
-lang = st.selectbox("اختر لغة الإشعار", ["العربية", "English", "עברית"])
-
-Default message templates
-
-def get_message(lang, product_name, current_qty): if lang == "العربية": return f"نود إعلامكم أن المنتج '{product_name}' قد وصل إلى الحد الأدنى. الكمية المتوفرة: {current_qty}." elif lang == "English": return f"We would like to inform you that the product '{product_name}' has reached its minimum threshold. Current stock: {current_qty}." elif lang == "עברית": return f"אנו רוצים להודיע לכם שהמוצר '{product_name}' הגיע לרף המינימום. כמות נוכחית: {current_qty}."
-
-Send alerts
-
-if st.button("تحقق وأرسل التنبيهات"): if len(email_list) == 0 or len(email_list) > 5: st.warning("يرجى إدخال من 1 إلى 5 إيميلات صحيحة.") else: alerts = [] for product in product_data: if product['name'] and product['current'] <= product['min']: alerts.append(product)
-
-if not alerts:
-        st.success("لا توجد منتجات وصلت للحد الأدنى.")
-    else:
-        try:
-            server = smtplib.SMTP('smtp.gmail.com', 587)
-            server.starttls()
-            server.login('stockalerts.ps@gmail.com', 'APP_PASSWORD')  # Use your app password here
-
-            for product in alerts:
-                msg = MIMEMultipart()
-                msg['Subject'] = "تنبيه مخزون"
-                msg['From'] = "stockalerts.ps@gmail.com"
-                msg['To'] = ", ".join(email_list)
-
-                message_body = get_message(lang, product['name'], product['current'])
-                msg.attach(MIMEText(message_body, 'plain'))
-
-                server.sendmail('stockalerts.ps@gmail.com', email_list, msg.as_string())
-
-            server.quit()
-            st.success("تم إرسال التنبيهات بنجاح!")
-        except Exception as e:
-            st.error(f"فشل في إرسال البريد الإلكتروني: {e}")
-
+st.subheader("Product Table")
+st.dataframe(st.session_state.data)
