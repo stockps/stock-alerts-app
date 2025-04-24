@@ -1,4 +1,11 @@
-import pandas as pd import smtplib import streamlit as st from email.mime.multipart import MIMEMultipart from email.mime.text import MIMEText from datetime import datetime, timedelta from googletrans import Translator import os
+import pandas as pd
+import smtplib
+import streamlit as st
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from datetime import datetime, timedelta
+from googletrans import Translator
+import os
 
 إعداد المترجم
 
